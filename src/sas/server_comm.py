@@ -11,7 +11,7 @@ class ServerComm:
     def __init__(self, host_ip, input_queue, output_queue, send_queue,
                     img_dir=None,
                     source='image',
-                    port=None,
+                    port=65432,
                     frame_width=640,
                     frame_height=480,
                     target_fps=30,

@@ -4,7 +4,6 @@ import queue
 import signal
 import cv2
 import numpy as np
-import pycuda.driver as cuda
 from dataclasses import dataclass
 import pstats
 import sys
@@ -12,22 +11,25 @@ import sys
 from sas.runner import Runner
 from sas.utils.toml import Config, load_toml
 from sas.utils.recorder import FrameRecorder
-from sas.utils.benchmark import SASBenchmark
+# from sas.utils.benchmark import SASBenchmark
 from sas.utils.model_loader import init_sas_process
+from sas.utils.argparser import parse_args
+from sas.server_comm import ServerComm
 
 @dataclass
 class AppConfig:
-    host_ip: str
-    frame_width: int
-    frame_height: int
-    source: str = ['camera', 'image'][0]
-    img_dir: str = "./saved/"
+    host_ip: str = ['127.0.0.1', '192.168.112.1'][0] # [0] for local testing]
+    frame_width: int = [(1920, 1080), (1080, 720)][0][0] # TODO:currently set for 1080p camera input
+    frame_height: int = [(1920, 1080), (1080, 720)][0][1] # TODO:currently set for 1080p camera input
+    source: str = ['camera', 'image'][1]
+    img_dir: str = '/mnt/c/Users/Caleb Cho/data/CULane/CULane_video_example/05081544_0305'
     target_fps: int = 37.5
     cam_index: int = 0
     cam_flip: bool = True
     record_interval: int = 1
     record_buffer_size: int = 1000
     profile: bool = "--profile" in sys.argv
+    benchmark: bool = False
 
 class SASApp:
     def __init__(self, app_config, args):
@@ -40,6 +42,9 @@ class SASApp:
         self.config = app_config
         if app_config.benchmark:
             self.benchmark = SASBenchmark()
+        else:
+            self.benchmark = None
+
         self.recorder = FrameRecorder(
             record_interval=app_config.record_interval,
             buffer_size=app_config.record_buffer_size,
@@ -49,7 +54,7 @@ class SASApp:
         # Load models 
         toml_config = Config(load_toml(args.config))
         # self.benchmark.start_benchmark("model_loading_time") TODO: pass label and function to measure instead?
-        self.sas_process = init_sas_process(toml_config, self.benchmark)
+        self.sas_process = init_sas_process(toml_config)
         # self.benchmark.end_benchmark("model_loading_time")
 
         # Create runner

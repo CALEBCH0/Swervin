@@ -1,7 +1,7 @@
 import time
 import cv2
 
-from sas.utils.benchmark import SASBenchmark
+# from sas.utils.benchmark import SASBenchmark
 
 class Runner:
     def __init__(self, input_queue, output_queue, send_queue, sas_process, recorder=None, benchmark=None):

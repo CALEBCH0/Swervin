@@ -1,20 +1,19 @@
 import cv2
 import numpy as np
-from sas.utils.utils_func import preproc_yolo, image_preprocessing
-from sas.utils._geometry_status import GeometryStatus
+# from sas.utils._geometry_status import GeometryStatus
 
 class SASProcessClass:
     def __init__(self,
-                conf,
+                config,
                 obj_detector=None,
-                lane_detector=None,
+                lane_segmenter=None,
                 tilt_detector=None
                 ):
-        self.conf = conf
+        self.config = config
         self.obj_detector = obj_detector
-        self.lane_detector = lane_detector
+        self.lane_segmenter = lane_segmenter
         self.tilt_detector = tilt_detector
-        self.status = GeometryStatus(conf.algoritm)
+        # self.status = GeometryStatus(config.algoritm)
 
     def __call__(self, input_img, img_area):
         self.forward(input_img, img_area)
@@ -36,7 +35,7 @@ class SASProcessClass:
         #   - confidence
         # TODO: binary or multi-class mask
 
-        mask, confidence = self.segment_lane(frame)
+        mask, confidence, metadata = self.lane_segmenter(frame)
 
         # BEV
         # input:
