@@ -1,17 +1,37 @@
+[app]
+active_env         = "local"    # "local" | "remote"
+source             = "camera"    # "camera" | "image"
+img_dir            = "/mnt/c/Users/Caleb Cho/data/CULane/CULane_video_example/05081544_0305"
+target_fps         = 37.5
+cam_index          = 0
+cam_flip           = true
+record_interval    = 1
+record_buffer_size = 1000
+
+[env.local]
+host_ip      = "127.0.0.1"
+frame_width  = 1920
+frame_height = 1080
+
+[env.remote]
+host_ip      = "192.168.112.1"
+frame_width  = 1080
+frame_height = 720
+
 [model_path]
-path_models = '/mnt/c/Users/Caleb Cho/code/Swervin/checkpoints'
+path_models = "/mnt/c/Users/Caleb Cho/code/Swervin/checkpoints"
 
 [lane_segmenter]
-name = 'AutoDriveERFNet'
-model_path = 'ERFNet_trained.pt'
-dataset = 'culane'
-device = 'cuda'
+name       = "AutoDriveERFNet"
+model_path = "ERFNet_trained.pt"
+dataset    = "culane"
+device     = "cuda"
 
-# name = 'CityscapesERFNet'
-# model_path = 'erfnet_cityscapes_512x1024_20200918.pt'
-# dataset = 'culane'
-# device = 'cuda'
+# name       = "CityscapesERFNet"
+# model_path = "erfnet_cityscapes_512x1024_20200918.pt"
+# dataset    = "culane"
+# device     = "cuda"
 
 [frontend]
-sock_host = 127.0.0.1
+sock_host = "127.0.0.1"
 sock_port = 65432
