@@ -1,7 +1,12 @@
+import glob
+import os
 import threading
 import queue
 import signal
 import sys
+
+import cv2
+import numpy as np
 
 from sas.runner import Runner
 from sas.utils.toml import Config, load_toml
@@ -9,6 +14,37 @@ from sas.utils.recorder import FrameRecorder
 from sas.utils.model_loader import init_sas_process
 from sas.utils.argparser import parse_args
 from sas.server_comm import ServerComm
+from sas.utils.bev_transformer import get_src, get_dst, compute_bev_transform
+
+
+def run_bev_calibration(raw_config):
+    bev_cfg = raw_config['bev']
+    output_size = tuple(bev_cfg['output_size'])
+    save_path = bev_cfg['homography_path']
+
+    img_path = bev_cfg.get('calibration_img')
+    if not img_path:
+        img_dir = raw_config['app']['img_dir']
+        frames = sorted(
+            f for ext in ('*.jpg', '*.jpeg', '*.png')
+            for f in glob.glob(os.path.join(img_dir, ext))
+        )
+        if not frames:
+            raise FileNotFoundError(f"No images found in {img_dir}")
+        img_path = frames[0]
+
+    img = cv2.imread(img_path)
+    if img is None:
+        raise FileNotFoundError(f"Could not read calibration image: {img_path}")
+    img = cv2.resize(img, output_size)
+
+    src = get_src(img)
+    dst = get_dst(output_size)
+    M, _ = compute_bev_transform(src, dst)
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    np.save(save_path, M)
+    print(f"BEV calibration saved to {save_path}. Re-run without --calibrate-bev to start.")
 
 
 class SASApp:
@@ -76,6 +112,11 @@ class SASApp:
 def main():
     args = parse_args()
     raw_config = load_toml(args.config)
+
+    if args.calibrate_bev:
+        run_bev_calibration(raw_config)
+        return
+
     app = SASApp(raw_config, args)
 
     if args.profile:

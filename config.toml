@@ -40,3 +40,9 @@ device     = "cuda"
 [frontend]
 sock_host = "127.0.0.1"
 sock_port = 65432
+
+[bev]
+enabled         = true
+homography_path = "/mnt/c/Users/Caleb Cho/code/Swervin/calibration/homography.npy"
+output_size     = [512, 512]
+calibration_img = "/mnt/c/Users/Caleb Cho/code/Swervin/calibration/tu.jpg"
