@@ -31,7 +31,7 @@ class Runner:
                     # self.benchmark.start_benchmark("sas_process_time")
 
                     result = self.sas_process(frame, img_area)
-
+                    print(f"SAS process result: {result}")
                     # self.benchmark.end_benchmark("sas_process_time")
 
                     # Record the frame and SAS status

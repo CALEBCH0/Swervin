@@ -1,6 +1,6 @@
 [app]
 active_env         = "local"    # "local" | "remote"
-source             = "camera"    # "camera" | "image"
+source             = "image"    # "camera" | "image"
 img_dir            = "/mnt/c/Users/Caleb Cho/data/CULane/CULane_video_example/05081544_0305"
 target_fps         = 37.5
 cam_index          = 0
@@ -22,8 +22,13 @@ frame_height = 720
 path_models = "/mnt/c/Users/Caleb Cho/code/Swervin/checkpoints"
 
 [lane_segmenter]
-name       = "AutoDriveERFNet"
-model_path = "ERFNet_trained.pt"
+# name       = "AutoDriveERFNet"
+# model_path = "ERFNet_trained.pt"
+# dataset    = "culane"
+# device     = "cuda"
+
+name       = "ONNXERFNet"
+model_path = "erfnet_baseline_culane_20210204.onnx"
 dataset    = "culane"
 device     = "cuda"
 

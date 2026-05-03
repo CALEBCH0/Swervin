@@ -1,7 +1,8 @@
 import os
 from sas.models.builder import LANE_SEGMENTERS
-from sas.utils.SAS_Process import SASProcessClass
+from sas.utils.sas_process import SASProcessClass
 import sas.models.lane_segmenter
+import sas.models.optimized_models  # Import ONNX and TensorRT models
 
 def init_sas_process(config):
     """
@@ -22,4 +23,5 @@ def init_sas_process(config):
         lane_segmenter=lane_segmenter
         # TODO: add other models later
     )
+    print("SAS process successfully initialized")
     return sas_process

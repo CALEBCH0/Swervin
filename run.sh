@@ -48,6 +48,31 @@ fi
 # Echo final command for debug
 echo "Running: $CMD &"
 $CMD &
+SERVER_PID=$!
 
-sleep 5
-python src/sas/gui_frontend.py
+# Store PID for cleanup
+echo "Server PID: $SERVER_PID"
+
+# Setup signal handlers for graceful shutdown
+cleanup() {
+      echo "Shutting down server (PID: $SERVER_PID)..."
+      if kill -0 $SERVER_PID 2>/dev/null; then
+          kill -TERM $SERVER_PID 2>/dev/null
+          sleep 2
+          kill -KILL $SERVER_PID 2>/dev/null || true
+      fi
+      echo "Cleanup complete."
+      exit 0
+  }
+# Trap signals to ensure cleanup
+trap cleanup SIGINT SIGTERM EXIT
+
+echo "Server started. Press Ctrl+C to stop gracefully."
+echo "Server listening on port 65432"
+
+echo "Waiting for server..."
+while ! ss -tln | grep -q ':65432'; do
+    sleep 0.5
+done
+echo "Server ready."
+QT_QPA_PLATFORM=wayland python src/sas/gui_frontend.py
