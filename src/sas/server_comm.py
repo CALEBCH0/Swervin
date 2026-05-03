@@ -169,7 +169,7 @@ class ServerComm:
         self.stop()
         self.shutdown_event.set() # Notify any waiting threads to exit
 
-        if self.recorder and self.recorder.is_recording():
+        if self.recorder and self.recorder.is_recording:
             self.recorder.stop_recording()
 
         if self.runner:

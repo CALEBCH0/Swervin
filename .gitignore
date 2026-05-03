@@ -1,3 +1,7 @@
+# Misc
+*.pdf
+*.deb
+
 # Python
 __pycache__/
 *.py[cod]
@@ -32,7 +36,7 @@ env/
 # PyTorch & ML Models
 *.pt
 *.pth
-*.onnx
+# *.onnx
 *.trt
 checkpoints/*.pt
 checkpoints/*.pth

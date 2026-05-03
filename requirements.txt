@@ -4,3 +4,13 @@ torch
 torchvision
 tomli
 PyQt5
+
+# Model optimization (optional)
+onnx
+onnxruntime-gpu  # Use onnxruntime for CPU-only
+onnxscript       # Required for PyTorch ONNX export
+protobuf         # ONNX dependency
+
+# TensorRT (install separately with CUDA):
+# tensorrt
+# pycuda

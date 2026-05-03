@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-# from sas.utils._geometry_status import GeometryStatus
+from sas.utils.sas_results import SASResults
 
 class SASProcessClass:
     def __init__(self,
@@ -13,8 +13,8 @@ class SASProcessClass:
         self.obj_detector = obj_detector
         self.lane_segmenter = lane_segmenter
         self.tilt_detector = tilt_detector
-        # self.status = GeometryStatus(config.algoritm)
-
+        self.results = SASResults()
+        
     def __call__(self, input_img, img_area):
         self.forward(input_img, img_area)
 
@@ -26,6 +26,8 @@ class SASProcessClass:
         # output:
         #   - normalized frame for segmentation
         frame = input_img.copy()
+        self.results.update_frame(frame)
+        print("New frame received")
         
         # Lane segmentation
         # input:
@@ -35,8 +37,10 @@ class SASProcessClass:
         #   - confidence
         # TODO: binary or multi-class mask
 
-        mask, confidence, metadata = self.lane_segmenter(frame)
-
+        mask, confidence = self.lane_segmenter(frame)
+        self.results.seg = SegResult(mask=mask, confidence=confidence)
+        print("Lane segmentation completed")
+        
         # BEV
         # input:
         #   - lane segmentation mask
@@ -45,7 +49,7 @@ class SASProcessClass:
         # output:
         #   - BEV lane mask
         #   - top-down warped representation of lane mask
-        bev_mask, warped_lane = self.bev_transform(mask)
+        # bev_mask, warped_lane = self.transform_to_bev(mask)
 
         # Lane mask points extraction in BEV
         # input:
@@ -53,7 +57,7 @@ class SASProcessClass:
         # output:
         #   - lane pixel coordinates
         # TODO: left/right lane + center-region point sets?
-        lane_points = self.extract_lane_points(bev_mask)
+        # lane_points = self.extract_lane_points(bev_mask)
 
         # Fit lane centerline polynomial
         # input:
@@ -61,7 +65,7 @@ class SASProcessClass:
         # output:
         #   - polynomial coefficents for left and right lane, centerline polynomial
         # x = ay^2 + by + c
-        lane_polynomials = self.fit_lane_polynomial(lane_points)
+        # lane_polynomials = self.fit_lane_polynomial(lane_points)
         
         # Curvature and lookahead point calculation
         # input:
@@ -74,7 +78,20 @@ class SASProcessClass:
         #   - lookahead point coordinates in BEV
         #   - heading angle
         #   - lateral offset
-        geometry = self.compute_geometry(lane_polynomials)
+        # geometry = self.compute_geometry(lane_polynomials)
+        # self.results.geometry = GeometryResult(
+        #             centerline=geometry['centerline'],
+        #             curvature=geometry['curvature'],
+        #             heading=geometry['heading'],
+        #             lookahead=geometry['lookahead']
+        #         )
+        
+        # # Control math
+        # steering_target = pure_pursuit(geometry)
+        
+        # self.results.control = ControlResult(
+        #     steering_target=steering_target,
+        #     steering_error=geometry['steering_error']
+        # )
 
-        # Control math
-        steering_target = pure_pursuit(geometry)
+        return frame, self.results
