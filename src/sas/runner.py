@@ -1,8 +1,6 @@
 import time
 import cv2
 
-# from sas.utils.benchmark import SASBenchmark
-
 class Runner:
     def __init__(self, input_queue, output_queue, send_queue, sas_process, recorder=None, benchmark=None):
         self.input_queue = input_queue
@@ -15,6 +13,7 @@ class Runner:
 
     def run(self):
         bad_cnt = 0
+        frame_count = 0
         while self.running:
             if not self.input_queue.empty():
                 frame = self.input_queue.get()
@@ -24,25 +23,18 @@ class Runner:
                     if bad_cnt > 3:
                         break
 
-                # self.benchmark.count_frame()
-
                 img_area = frame.shape[0] * frame.shape[1]
                 if self.output_queue.empty():
-                    # self.benchmark.start_benchmark("sas_process_time")
-
+                    print(f"[Runner] Processing frame {frame_count}, shape={frame.shape}")
                     result = self.sas_process(frame, img_area)
-                    print(f"SAS process result: {result}")
-                    # self.benchmark.end_benchmark("sas_process_time")
-
-                    # Record the frame and SAS status
-                    if self.recorder:
-                        self.recorder.record(cv2.split(frame)[0], self.sas_process.status)
+                    print(f"[Runner] Frame {frame_count} done")
+                    frame_count += 1
 
                     self.output_queue.put(result)
                 if self.send_queue.empty():
                     self.send_queue.put(frame)
             else:
                 time.sleep(0.01)
-    
+
     def stop(self):
         self.running = False

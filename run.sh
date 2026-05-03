@@ -84,4 +84,4 @@ while ! ss -tln | grep -q ':65432'; do
     sleep 0.5
 done
 echo "Server ready."
-QT_QPA_PLATFORM=wayland python src/sas/gui_frontend.py
+LIBGL_ALWAYS_SOFTWARE=1 QT_QPA_PLATFORM=wayland python src/sas/gui_frontend.py

@@ -3,7 +3,7 @@ import os
 import cv2
 import numpy as np
 
-from sas.utils.sas_results import SASResults
+from sas.utils.sas_results import SASResults, SegResult
 from sas.utils.bev_transformer import apply_bev_transform
 
 
@@ -40,8 +40,8 @@ class SASProcessClass:
         self.results.update_frame(frame)
 
         # Lane segmentation
-        mask, confidence = self.lane_segmenter(frame)
-        self.results.seg = (mask, confidence)
+        mask, confidence, _ = self.lane_segmenter(frame)
+        self.results.seg = SegResult(mask=mask, confidence=confidence)
 
         # BEV transform
         if self.M_bev is not None:

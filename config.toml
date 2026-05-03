@@ -30,7 +30,7 @@ path_models = "/mnt/c/Users/Caleb Cho/code/Swervin/checkpoints"
 name       = "ONNXERFNet"
 model_path = "erfnet_baseline_culane_20210204.onnx"
 dataset    = "culane"
-device     = "cuda"
+device     = "cpu"
 
 # name       = "CityscapesERFNet"
 # model_path = "erfnet_cityscapes_512x1024_20200918.pt"

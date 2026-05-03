@@ -76,7 +76,7 @@ class SASApp:
 
         self.comm = ServerComm(
             host_ip=env["host_ip"],
-            input_queue=self.send_queue,
+            input_queue=self.input_queue,
             output_queue=self.output_queue,
             send_queue=self.send_queue,
             frame_width=env["frame_width"],

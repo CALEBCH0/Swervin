@@ -2,8 +2,9 @@ import cv2
 import numpy as np
 
 def imagenet_preprocess(input, size):
+    h, w = size  # size is (height, width)
     input = cv2.cvtColor(input, cv2.COLOR_BGR2RGB)
-    input = cv2.resize(input, (size, size), interpolation=cv2.INTER_LINEAR)
+    input = cv2.resize(input, (w, h), interpolation=cv2.INTER_LINEAR)
     input = input.astype(np.float32) / 255.0
 
     mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
