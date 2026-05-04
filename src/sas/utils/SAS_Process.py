@@ -40,8 +40,12 @@ class SASProcessClass:
         self.results.update_frame(frame)
 
         # Lane segmentation
-        mask, confidence, _ = self.lane_segmenter(frame)
-        self.results.seg = SegResult(mask=mask, confidence=confidence)
+        mask, confidence, metadata = self.lane_segmenter(frame)
+        self.results.seg = SegResult(
+            mask=mask,
+            confidence=confidence,
+            lane_confidences=metadata.get('lane_confidences'),
+        )
 
         # BEV transform
         if self.M_bev is not None:

@@ -28,20 +28,26 @@ class Runner:
                 frame_out = frame
                 if self.output_queue.empty():
                     print(f"[Runner] Processing frame {frame_count}, shape={frame.shape}")
+                    t0 = time.monotonic()
                     result = self.sas_process(frame, img_area)
+                    elapsed = time.monotonic() - t0
                     print(f"[Runner] Frame {frame_count} done")
                     frame_count += 1
 
                     frame_out, results = result
+                    results.fps = 1.0 / elapsed if elapsed > 0 else None
+                    mask = None
                     if results.bev is not None:
-                        bev_vis = np.zeros((*results.bev.bev_mask.shape, 3), dtype=np.uint8)
-                        bev_vis[results.bev.bev_mask > 0] = (0, 200, 0)
-                        inset = cv2.resize(bev_vis, (200, 200), interpolation=cv2.INTER_NEAREST)
+                        mask = results.bev.bev_mask
+                    elif results.seg is not None:
+                        mask = results.seg.mask
+                    if mask is not None:
+                        vis = np.zeros((*mask.shape, 3), dtype=np.uint8)
+                        vis[mask > 0] = (0, 200, 0)
+                        inset = cv2.resize(vis, (200, 200), interpolation=cv2.INTER_NEAREST)
                         h, w = frame_out.shape[:2]
                         frame_out = frame_out.copy()
                         frame_out[0:200, w - 200:w] = inset
-                    else:
-                        print(f"[Runner] No BEV output for frame {frame_count - 1}")
 
                     self.output_queue.put(result)
                 if self.send_queue.empty():

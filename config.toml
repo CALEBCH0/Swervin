@@ -42,7 +42,7 @@ sock_host = "127.0.0.1"
 sock_port = 65432
 
 [bev]
-enabled         = true
+enabled         = false
 homography_path = "/mnt/c/Users/Caleb Cho/code/Swervin/calibration/homography.npy"
 output_size     = [512, 512]
 mask_size       = [800, 288]   # (width, height) — must match segmentation model output (ONNXERFNet input_size = (288, 800))

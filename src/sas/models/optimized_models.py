@@ -81,18 +81,18 @@ class ONNXERFNet(BaseModelClass):
         # Convert to binary mask (argmax across classes)
         binary_mask = np.argmax(seg_mask, axis=0).astype(np.uint8)
         
-        # Calculate confidence from lane existence or segmentation confidence
         if lane_exist is not None:
-            confidence = float(np.max(lane_exist[0]))
+            lane_confidences = (1 / (1 + np.exp(-lane_exist[0]))).tolist()  # logits → probabilities
+            confidence = float(max(lane_confidences))
         else:
-            # Use max probability as confidence
+            lane_confidences = None
             confidence = float(np.max(np.max(seg_mask, axis=(1, 2))))
-        
+
         # Resize mask to original input size if needed
         if binary_mask.shape != self.INPUT_SIZE:
             binary_mask = cv2.resize(binary_mask, (self.INPUT_SIZE[1], self.INPUT_SIZE[0]))
-        
-        metadata = {'model_type': 'onnx', 'num_classes': seg_mask.shape[0]}
+
+        metadata = {'model_type': 'onnx', 'num_classes': seg_mask.shape[0], 'lane_confidences': lane_confidences}
         
         return binary_mask, confidence, metadata
     

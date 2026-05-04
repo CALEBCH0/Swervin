@@ -9,10 +9,10 @@ class BaseModelClass(ABC):
         """Frame to normalized tensor ready for the model"""
 
     @abstractmethod
-    def _postprocess(self, raw_output) -> tuple[np.ndarray, float]:
-        """Raw model output to (binary mask, confidence)"""
+    def _postprocess(self, raw_output) -> tuple[np.ndarray, float, dict]:
+        """Raw model output to (binary mask, confidence, metadata)"""
 
-    def infer(self, frame: np.ndarray) -> tuple[np.ndarray, float]:
+    def infer(self, frame: np.ndarray) -> tuple[np.ndarray, float, dict]:
         """Run the full inference pipeline on a single frame"""
         tensor = self._preprocess(frame)
         with torch.no_grad():
