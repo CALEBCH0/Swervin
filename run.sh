@@ -1,21 +1,26 @@
 PROFILE_FLAG=""
 SESSION_NAME=""
+CALIBRATE_BEV_FLAG=""
 
 # Parse flags
 while [[ $# -gt 0 ]]; do
     case $1 in
         -p|--profile)
             PROFILE_FLAG="--profile"
-            shift # past argument
+            shift
+            ;;
+        --calibrate-bev)
+            CALIBRATE_BEV_FLAG="--calibrate-bev"
+            shift
             ;;
         -h|--help)
-            echo "Usage: $0 [-p|--profile] [session_name]"
+            echo "Usage: $0 [-p|--profile] [--calibrate-bev] [session_name]"
             echo "  -p, --profile      Run with profiling enabled"
+            echo "  --calibrate-bev    Run interactive BEV calibration and save homography, then exit"
             echo "  session_name       Optional session name for recording (passed to --record)"
             exit 0
             ;;
         *)
-            # If argument does not start with dash, treat as session name
             if [[ -z "$SESSION_NAME" && "$1" != -* ]]; then
                 SESSION_NAME="$1"
                 shift
@@ -31,18 +36,23 @@ done
 cd '/mnt/c/Users/Caleb Cho/code/Swervin'
 source .venv/bin/activate
 
-# Add src directory to Python path so 'sas' module can be found
 export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
 
 CMD="python src/sas/run_sas.py"
 
-# Add flags as needed
 if [ -n "$PROFILE_FLAG" ]; then
     CMD="$CMD $PROFILE_FLAG"
 fi
 
 if [ -n "$SESSION_NAME" ]; then
     CMD="$CMD --record $SESSION_NAME"
+fi
+
+if [ -n "$CALIBRATE_BEV_FLAG" ]; then
+    CMD="$CMD $CALIBRATE_BEV_FLAG"
+    echo "Running: $CMD"
+    $CMD
+    exit $?
 fi
 
 # Echo final command for debug
@@ -64,7 +74,6 @@ cleanup() {
       echo "Cleanup complete."
       exit 0
   }
-# Trap signals to ensure cleanup
 trap cleanup SIGINT SIGTERM EXIT
 
 echo "Server started. Press Ctrl+C to stop gracefully."
@@ -75,4 +84,4 @@ while ! ss -tln | grep -q ':65432'; do
     sleep 0.5
 done
 echo "Server ready."
-QT_QPA_PLATFORM=wayland python src/sas/gui_frontend.py
+LIBGL_ALWAYS_SOFTWARE=1 QT_QPA_PLATFORM=wayland python src/sas/gui_frontend.py

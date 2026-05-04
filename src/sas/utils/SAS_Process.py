@@ -1,6 +1,11 @@
+import os
+
 import cv2
 import numpy as np
-from sas.utils.sas_results import SASResults
+
+from sas.utils.sas_results import SASResults, SegResult, BEVResult
+from sas.utils.bev_transformer import apply_bev_transform
+
 
 class SASProcessClass:
     def __init__(self,
@@ -14,81 +19,61 @@ class SASProcessClass:
         self.lane_segmenter = lane_segmenter
         self.tilt_detector = tilt_detector
         self.results = SASResults()
-        
+
+        self.M_bev = None
+        self.bev_output_size = None
+        if config.bev.enabled:
+            path = config.bev.homography_path
+            if not os.path.exists(path):
+                raise FileNotFoundError(
+                    f"BEV homography not found at {path}. Run with --calibrate-bev first."
+                )
+            self.M_bev = np.load(path)
+            self.bev_output_size = tuple(config.bev.output_size)
+
     def __call__(self, input_img, img_area):
-        self.forward(input_img, img_area)
+        return self.forward(input_img, img_area)
 
     def forward(self, input_img, img_area):
         """Main process for SAS pipeline"""
-        # Camera frame
-        # input:
-        #   - 3 channel BGR image
-        # output:
-        #   - normalized frame for segmentation
         frame = input_img.copy()
         self.results.update_frame(frame)
-        print("New frame received")
-        
+
         # Lane segmentation
-        # input:
-        #   - preprocessed frame
-        # output:
-        #   - lane segmentation mask
-        #   - confidence
-        # TODO: binary or multi-class mask
+        mask, confidence, metadata = self.lane_segmenter(frame)
+        self.results.seg = SegResult(
+            mask=mask,
+            confidence=confidence,
+            lane_confidences=metadata.get('lane_confidences'),
+        )
 
-        mask, confidence = self.lane_segmenter(frame)
-        self.results.seg = SegResult(mask=mask, confidence=confidence)
-        print("Lane segmentation completed")
-        
-        # BEV
-        # input:
-        #   - lane segmentation mask
-        #   - perspective transformation matrix
-        #   - camera calibration parameters
-        # output:
-        #   - BEV lane mask
-        #   - top-down warped representation of lane mask
-        # bev_mask, warped_lane = self.transform_to_bev(mask)
-
+        # BEV transform
+        if self.M_bev is not None:
+            print("[SASProcess] Applying BEV transform")
+            bev_mask = apply_bev_transform(mask, self.M_bev, self.bev_output_size)
+            if bev_mask is None:
+                print("[SASProcess] BEV transform failed, got None")
+            self.results.bev = BEVResult(bev_mask=bev_mask, src_points=None)  # src_points can be added later if needed
+        else:
+            print("[SASProcess] No BEV homography available, skipping BEV transform")
         # Lane mask points extraction in BEV
-        # input:
-        #   - BEV lane mask
-        # output:
-        #   - lane pixel coordinates
-        # TODO: left/right lane + center-region point sets?
         # lane_points = self.extract_lane_points(bev_mask)
 
         # Fit lane centerline polynomial
-        # input:
-        #   - BEV lane points
-        # output:
-        #   - polynomial coefficents for left and right lane, centerline polynomial
         # x = ay^2 + by + c
         # lane_polynomials = self.fit_lane_polynomial(lane_points)
-        
+
         # Curvature and lookahead point calculation
-        # input:
-        #   - lane polynomial coefficients
-        #   - current vehicle position in BEV
-        #   - vehicle speed
-        #   - confidence
-        # output:
-        #   - lane curvature
-        #   - lookahead point coordinates in BEV
-        #   - heading angle
-        #   - lateral offset
         # geometry = self.compute_geometry(lane_polynomials)
         # self.results.geometry = GeometryResult(
-        #             centerline=geometry['centerline'],
-        #             curvature=geometry['curvature'],
-        #             heading=geometry['heading'],
-        #             lookahead=geometry['lookahead']
-        #         )
-        
-        # # Control math
+        #     centerline=geometry['centerline'],
+        #     curvature=geometry['curvature'],
+        #     heading=geometry['heading'],
+        #     lookahead=geometry['lookahead']
+        # )
+
+        # Control math
         # steering_target = pure_pursuit(geometry)
-        
         # self.results.control = ControlResult(
         #     steering_target=steering_target,
         #     steering_error=geometry['steering_error']

@@ -1,6 +1,7 @@
 import socket
 import struct
 import numpy as np
+import cv2
 import sys
 import time
 import threading
@@ -36,27 +37,26 @@ class ServerComm:
 
         if source == 'camera':
             from sas.datagenerator import CameraDataGenerator
-            self.image_generator = CameraDataGenerator(cam_index, cam_flip, frame_width, frame_height)
+            self.image_generator = CameraDataGenerator(cam_index, frame_width, frame_height, flip=cam_flip)
         elif source == 'image' and img_dir:
             from sas.datagenerator import ImageDataGenerator
             self.image_generator = ImageDataGenerator(self.img_dir)
         else:
             raise ValueError(f"Unsupported source type: {source}. Must be 'camera' or 'image' with a valid image directory.")
 
-        # Create a queue for buggering frames from image generator
         self.frame_buffer = queue.Queue(maxsize=2)
         self.generator_thread = None
         self.running = False
 
     def setup_socket(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # for immediate reconnection
-        self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True) # disable Nagle's algorithm
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 2**20)
         self.socket.bind(self.server_address)
         self.socket.listen(1)
         print(f"Server: Listening on {self.server_address[0]}:{self.server_address[1]}")
-    
+
     def accept_connection(self):
         self.conn, addr = self.socket.accept()
         print(f"Server: Connection accepted from {addr}")
@@ -64,41 +64,41 @@ class ServerComm:
         self.conn.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2**20)
 
     def send_data(self, image, label_data):
-        # print("Server: Sending data", self.frame_height, self.frame_width)
-        assert image.dtype == np.uint8, "Image must be in RGB888 format (uint8)"
-        # print("Server: Sending data", len(label_data))
-        # Pack the image data
-        image_data = image.tobytes()
-        packed_data = struct.pack('!I', len(image_data)) + image_data + label_data
+        _, jpeg_buf = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        image_data = jpeg_buf.tobytes()
+        packed_data = (struct.pack('!I', len(image_data)) + image_data +
+                       struct.pack('!I', len(label_data)) + label_data)
+        print(f"[Server] Sending: {len(image_data)}B img, {len(label_data)}B json")
         self.conn.sendall(packed_data)
 
     def _frame_generator_thread(self):
-        """Thread function to continuously read frames from image generator"""
+        count = 0
+        print("[Generator] Thread started")
         while self.running:
             try:
                 image = next(self.image_generator)
                 if image is not None:
-                    # Only put frame if queue has space, otherwise drop oldest
                     if self.frame_buffer.full():
                         try:
-                            self.frame_buffer.get_nowait()  # Drop oldest frame
+                            self.frame_buffer.get_nowait()
                         except queue.Empty:
                             pass
                     self.frame_buffer.put(image)
+                    count += 1
+                    if count <= 3 or count % 50 == 0:
+                        print(f"[Generator] Loaded frame {count}, shape={image.shape}, buffer_size={self.frame_buffer.qsize()}")
             except StopIteration:
-                # Handle end of image sequence for ImageDataGenerator
+                print(f"[Generator] Exhausted after {count} frames")
                 break
             except Exception as e:
-                print(f"Server: Error in frame generator thread: {e}")
+                print(f"[Generator] Error: {e}")
                 break
-            time.sleep(0.01)  # Small sleep to prevent tight loop if generator is fast
-    
+            time.sleep(0.01)
+        print("[Generator] Thread exiting")
+
     def handle_command(self, command_data: bytes):
-        """Handle commands received from client"""
         try:
             command = command_data.decode('utf-8')
-            # print(f"Server: Received command: {command}")
-
             if command == 'TERMINATE':
                 print("Server: Received TERMINATE command. Shutting down server.")
                 self.initiate_shutdown()
@@ -116,20 +116,21 @@ class ServerComm:
             print("Server: Failed to decode command data. Invalid UTF-8 sequence.")
         except Exception as e:
             print(f"Server: Error handling command: {e}")
-    
+
     def run(self):
-        # Start the frame generator thread
         self.running = True
         self.generator_thread = threading.Thread(target=self._frame_generator_thread, daemon=True)
         self.generator_thread.start()
+        print("[Server] run() loop started")
 
         try:
+            loop_count = 0
             while self.running:
                 # Check for incoming commands from client
                 try:
-                    ready = select.select([self.conn], [], [], 0.001) # 1ms timeout
+                    ready = select.select([self.conn], [], [], 0.001)
                     if ready[0]:
-                        ctrl_data = self.conn.recv(1024) # Adjust buffer size as needed
+                        ctrl_data = self.conn.recv(1024)
                         if ctrl_data:
                             self.handle_command(ctrl_data)
                         else:
@@ -140,23 +141,31 @@ class ServerComm:
                     print("Server: Client connection lost.")
                     self.running = False
                     break
-                
-                # Get frame from buffer instead of directly from generator
+
+                # Get frame from buffer
                 try:
-                    image = self.frame_buffer.get(timeout=0.1) # Wait for frame to be available
+                    image = self.frame_buffer.get(timeout=0.1)
                 except queue.Empty:
-                    time.sleep(0.01)  # No frame available, wait a bit and check again
+                    loop_count += 1
+                    if loop_count <= 5 or loop_count % 50 == 0:
+                        print(f"[Server] frame_buffer empty (loop {loop_count}), input_q={self.input_queue.qsize()}, output_q={self.output_queue.qsize()}, send_q={self.send_queue.qsize()}")
+                    time.sleep(0.01)
                     continue
-                
+
+                loop_count += 1
+                print(f"[Server] Got frame from buffer, shape={image.shape}, input_q={self.input_queue.qsize()}, output_q={self.output_queue.qsize()}, send_q={self.send_queue.qsize()}")
+
                 if image is not None:
-                    # image = cv2.flip(image, 1)
                     if self.input_queue.empty():
                         self.input_queue.put(image)
-                    if not self.output_queue.empty() and not self.send_queue.full():
-                        label_values = self.output_queue.get()
+                        print(f"[Server] Pushed to input_queue")
+                    else:
+                        print(f"[Server] input_queue full, dropping frame")
+                    if not self.output_queue.empty() and not self.send_queue.empty():
+                        _, results = self.output_queue.get()
                         img_send = self.send_queue.get()
-                        self.send_data(img_send, label_values)
-                time.sleep(0.01)  # Sleep to maintain target FPS
+                        self.send_data(img_send, results.to_json())
+                time.sleep(0.01)
         finally:
             self.cleanup()
 
@@ -167,7 +176,7 @@ class ServerComm:
     def initiate_shutdown(self):
         print("Server: Initiating shutdown...")
         self.stop()
-        self.shutdown_event.set() # Notify any waiting threads to exit
+        self.shutdown_event.set()
 
         if self.recorder and self.recorder.is_recording:
             self.recorder.stop_recording()
@@ -179,7 +188,6 @@ class ServerComm:
         self.running = False
 
     def cleanup(self):
-        # Stop the generator thread
         print("Server: Cleaning up resources...")
         self.running = False
         if self.generator_thread and self.generator_thread.is_alive():
@@ -189,5 +197,5 @@ class ServerComm:
             self.conn.close()
         if self.socket:
             self.socket.close()
-        
+
         print("Server: Cleanup complete.")

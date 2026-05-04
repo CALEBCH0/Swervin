@@ -30,7 +30,7 @@ path_models = "/mnt/c/Users/Caleb Cho/code/Swervin/checkpoints"
 name       = "ONNXERFNet"
 model_path = "erfnet_baseline_culane_20210204.onnx"
 dataset    = "culane"
-device     = "cuda"
+device     = "cpu"
 
 # name       = "CityscapesERFNet"
 # model_path = "erfnet_cityscapes_512x1024_20200918.pt"
@@ -40,3 +40,10 @@ device     = "cuda"
 [frontend]
 sock_host = "127.0.0.1"
 sock_port = 65432
+
+[bev]
+enabled         = true
+homography_path = "/mnt/c/Users/Caleb Cho/code/Swervin/calibration/homography.npy"
+output_size     = [512, 512]
+mask_size       = [800, 288]   # (width, height) — must match segmentation model output (ONNXERFNet input_size = (288, 800))
+calibration_img = "/mnt/c/Users/Caleb Cho/code/Swervin/calibration/culane.jpg"

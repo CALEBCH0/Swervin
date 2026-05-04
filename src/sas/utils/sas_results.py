@@ -6,6 +6,12 @@ from dataclasses import dataclass
 class SegResult:
     mask: np.ndarray
     confidence: float
+    lane_confidences: list | None = None
+
+@dataclass
+class BEVResult:
+    bev_mask: np.ndarray
+    src_points: np.ndarray
 
 @dataclass
 class GeometryResult:
@@ -22,11 +28,9 @@ class ControlResult:
 @dataclass
 class SASResults:
     frame: np.ndarray | None = None
-    # frame_id: int | None = None   #TODO: add those later
-    # frame_timestamp: float | None = None
-    # fps: float | None = None
-    # timings: dict[str, float] | None = None
+    fps: float | None = None
     seg: SegResult | None = None
+    bev: BEVResult | None = None
     geometry: GeometryResult | None = None
     control: ControlResult | None = None
     active: bool = False
@@ -37,16 +41,21 @@ class SASResults:
         self.reset()
 
     def reset(self):
+        self.fps = None
         self.seg = None
+        self.bev = None
         self.geometry = None
         self.control = None
         self.active = False
 
     def to_json(self) -> bytes:
         payload = {'active': self.active}
+        if self.fps is not None:
+            payload['fps'] = round(self.fps, 1)
         if self.seg:
-            payload['segmentation_mask'] = self.seg.mask.tolist()  # Convert numpy array to list for JSON serialization
             payload['confidence'] = self.seg.confidence
+            if self.seg.lane_confidences is not None:
+                payload['lane_confidences'] = self.seg.lane_confidences
         if self.geometry:
             payload['centerline'] = self.geometry.centerline.tolist()
             payload['curvature'] = self.geometry.curvature

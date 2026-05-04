@@ -19,19 +19,16 @@ class CameraDataGenerator:
         self.cap.set(cv2.CAP_PROP_FPS, 30)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        
+
         if not self.cap.isOpened():
             raise Exception(f"Camera with index {camera_index} could not be opened.")
 
 
     def __iter__(self):
         return self
-    
+
     def __next__(self):
         ret, frame = self.cap.read()
-
-        # recording raw camera input
-        # cv2.imwrite("./tests/data/camera/camera.png", frame)
 
         if not ret:
             raise Exception("Failed to read frame from camera.")
@@ -40,7 +37,7 @@ class CameraDataGenerator:
 
         if not frame.shape[1] == self.width and not frame.shape[0] == self.height:
             frame = cv2.resize(frame, (self.width, self.height))
-        return frame  # cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        return frame
 
     def release(self):
             self.cap.release()
@@ -56,22 +53,20 @@ def sigmoid(image, k=0.001):
 class ImageDataGenerator:
     def __init__(self, directory):
         self.directory = directory
-        self.image_files = [f for f in os.listdir(directory) if f.endswith(('.png', '.jpg', '.jpeg'))]
+        self.image_files = sorted([f for f in os.listdir(directory) if f.endswith(('.png', '.jpg', '.jpeg'))])
         if not self.image_files:
             raise Exception(f"No image files found in directory {directory}.")
         self.index = 0
-    
+
     def __iter__(self):
         return self
 
     def __next__(self):
         if self.index >= len(self.image_files):
-            return None
+            raise StopIteration
 
         image_path = os.path.join(self.directory, self.image_files[self.index])
-        image = Image.open(image_path)
-        # image = np.array(image)
-        image_data = np.array(image)
+        image_data = cv2.cvtColor(np.array(Image.open(image_path)), cv2.COLOR_RGB2BGR)
         self.index += 1
 
         return image_data

@@ -19,4 +19,8 @@ def parse_args():
         "-r", "--record", type=str, default="default",
         help="Session name for recorder"
     )
+    parser.add_argument(
+        "--calibrate-bev", action="store_true",
+        help="Run interactive BEV calibration and save homography, then exit"
+    )
     return parser.parse_args()

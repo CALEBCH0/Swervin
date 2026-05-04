@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import Qt, QTimer
 
@@ -14,6 +14,40 @@ def exception_hook(exctype, value, traceback):
 
 sys._excepthook = sys.excepthook
 sys.excepthook = exception_hook
+
+
+class StatsPanel(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(4)
+        layout.setAlignment(Qt.AlignTop)
+        self.setLayout(layout)
+
+        title = QLabel("── Stats ──")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        self.fps_label = QLabel("FPS: —")
+        layout.addWidget(self.fps_label)
+
+        self.lane_labels = [QLabel(f"L{i+1}: —") for i in range(4)]
+        for lbl in self.lane_labels:
+            layout.addWidget(lbl)
+
+    def update(self, label_data: dict):
+        fps = label_data.get('fps')
+        self.fps_label.setText(f"FPS: {fps:.1f}" if fps is not None else "FPS: —")
+
+        lane_conf = label_data.get('lane_confidences')
+        if lane_conf:
+            for i, lbl in enumerate(self.lane_labels):
+                v = lane_conf[i] if i < len(lane_conf) else None
+                lbl.setText(f"L{i+1}: {v:.2f}" if v is not None else f"L{i+1}: —")
+        else:
+            for i, lbl in enumerate(self.lane_labels):
+                lbl.setText(f"L{i+1}: —")
 
 
 class MainWindow(QWidget):
@@ -38,8 +72,14 @@ class MainWindow(QWidget):
         self.video_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.video_label, stretch=3)
 
+        bottom_row = QWidget()
+        bottom_layout = QHBoxLayout(bottom_row)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
         self.tilt_indicator = TiltIndicator()
-        layout.addWidget(self.tilt_indicator, stretch=1)
+        self.stats_panel = StatsPanel()
+        bottom_layout.addWidget(self.tilt_indicator, stretch=3)
+        bottom_layout.addWidget(self.stats_panel, stretch=1)
+        layout.addWidget(bottom_row, stretch=1)
 
     def update_view(self):
         frame = None
@@ -68,6 +108,7 @@ class MainWindow(QWidget):
         if label_data is not None:
             self.tilt_indicator.set_current_tilt(label_data.get('current_tilt', 0.0))
             self.tilt_indicator.set_target_tilt(label_data.get('target_tilt', 0.0))
+            self.stats_panel.update(label_data)
 
     def closeEvent(self, event):
         self.timer.stop()
