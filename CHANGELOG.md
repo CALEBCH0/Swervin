@@ -4,6 +4,16 @@
 
 ### Bug Fixes
 
+#### lane_exist output treated as probabilities but is raw logits
+Date: 2026-05-03
+**Type:** Bug Fix
+**Context:** `ONNXERFNet._postprocess` called `.tolist()` directly on `lane_exist[0]`, producing values in the range ~2–7 instead of [0, 1]. These unbounded values were stored in `SegResult.lane_confidences` and displayed in the GUI stats panel.
+**Cause:** The ERFNet CULane model outputs `lane_exist` as raw logits (pre-sigmoid binary classification scores), not probabilities.
+**Fix:** Applied sigmoid (`1 / (1 + exp(-x))`) to `lane_exist[0]` before converting to a list.
+**Files changed:**
+- `src/sas/models/optimized_models.py`
+**Impact:** Per-lane confidence values are now correctly bounded to [0, 1] and interpretable as probabilities.
+
 #### BEV calibration image resized to wrong coordinate space
 Date: 2026-05-03
 **Type:** Bug Fix
@@ -26,6 +36,20 @@ Date: 2026-05-03
 **Impact:** Runner thread no longer crashes silently on first frame; BEV results are stored correctly.
 
 ### Features
+
+#### Lane stats panel showing FPS and per-lane confidence
+Date: 2026-05-03
+**Type:** Feature
+**Context:** Per-lane confidence values from `lane_exist` were computed but never surfaced to the user. FPS was also not visible anywhere in the GUI.
+**Change:** Added `StatsPanel` widget to `gui_frontend.py`. Placed in a `QHBoxLayout` bottom row to the right of the tilt indicator (stretch 1:3). Displays `FPS: x.x` and `L1–L4: x.xx` confidence values, updated every timer tick. FPS is measured per-frame in `runner.py` using `time.monotonic()` and written to `SASResults.fps`. Per-lane confidences flow through `SegResult.lane_confidences` → `to_json()` → client.
+**Behavior:** Bottom row shows tilt indicator on the left and stats panel on the right. Values show "—" until first frame arrives, then update live.
+**Files changed:**
+- `src/sas/gui_frontend.py`
+- `src/sas/runner.py`
+- `src/sas/utils/sas_results.py`
+- `src/sas/utils/SAS_Process.py`
+- `src/sas/models/optimized_models.py`
+**Impact:** FPS and per-lane detection confidence are visible in the GUI in real time.
 
 #### BEV lane mask inset in transmitted GUI frame
 Date: 2026-05-03
@@ -70,6 +94,16 @@ Date: 2026-05-03
 ### Dependencies
 
 ### Data and Schema
+
+#### fps and lane_confidences added to SASResults schema and JSON payload
+Date: 2026-05-03
+**Type:** Data/Schema
+**Context:** `SASResults` had `fps` stubbed out as a comment; `SegResult` had no per-lane breakdown. Both were needed for the stats panel.
+**Change:** Added `fps: float | None` to `SASResults`; added `lane_confidences: list | None` to `SegResult`. Both fields are reset in `reset()`, serialized in `to_json()` (`fps` rounded to 1 decimal, `lane_confidences` as a 4-element list). `BaseModelClass._postprocess` and `infer` signatures updated from `(mask, confidence)` to `(mask, confidence, dict)`.
+**Files changed:**
+- `src/sas/utils/sas_results.py`
+- `src/sas/models/base_model.py`
+**Impact:** Downstream consumers (GUI, future logging) receive FPS and per-lane confidence in every JSON frame without additional protocol changes.
 
 #### BEVResult dataclass; rename bev_mask field in SASResults
 Date: 2026-05-03
