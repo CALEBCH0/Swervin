@@ -10,7 +10,7 @@ class BaseModelClass(ABC):
 
     @abstractmethod
     def _postprocess(self, raw_output) -> tuple[np.ndarray, float]:
-        """Raw model output to (binary mask, confidence, metadata)"""
+        """Raw model output to (binary mask, confidence)"""
 
     def infer(self, frame: np.ndarray) -> tuple[np.ndarray, float]:
         """Run the full inference pipeline on a single frame"""

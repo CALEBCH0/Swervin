@@ -7,7 +7,7 @@ import numpy as np
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
-from sas.utils.bev_transformer import BEVTransformer, get_src, get_dst, compute_bev_transform, apply_bev_transform
+from sas.utils.bev_transformer import get_src, get_dst, compute_bev_transform, apply_bev_transform
 
 OUTPUT_SIZE = (512, 512)
 

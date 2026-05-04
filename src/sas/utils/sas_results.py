@@ -8,6 +8,11 @@ class SegResult:
     confidence: float
 
 @dataclass
+class BEVResult:
+    bev_mask: np.ndarray
+    src_points: np.ndarray
+
+@dataclass
 class GeometryResult:
     centerline: np.ndarray
     curvature: float
@@ -22,8 +27,12 @@ class ControlResult:
 @dataclass
 class SASResults:
     frame: np.ndarray | None = None
+    # frame_id: int | None = None   #TODO: add those later
+    # frame_timestamp: float | None = None
+    # fps: float | None = None
+    # timings: dict[str, float] | None = None
     seg: SegResult | None = None
-    bev_mask: np.ndarray | None = None
+    bev: BEVResult | None = None
     geometry: GeometryResult | None = None
     control: ControlResult | None = None
     active: bool = False
@@ -35,7 +44,7 @@ class SASResults:
 
     def reset(self):
         self.seg = None
-        self.bev_mask = None
+        self.bev = None
         self.geometry = None
         self.control = None
         self.active = False
@@ -43,7 +52,11 @@ class SASResults:
     def to_json(self) -> bytes:
         payload = {'active': self.active}
         if self.seg:
+            payload['segmentation_mask'] = self.seg.mask.tolist()  # Convert numpy array to list for JSON serialization
             payload['confidence'] = self.seg.confidence
+        if self.bev:
+            payload['bev_mask'] = self.bev.bev_mask.tolist()
+            payload['src_points'] = self.bev.src_points.tolist()
         if self.geometry:
             payload['centerline'] = self.geometry.centerline.tolist()
             payload['curvature'] = self.geometry.curvature

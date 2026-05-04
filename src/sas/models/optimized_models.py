@@ -51,6 +51,12 @@ class ONNXERFNet(BaseModelClass):
         print(f"✅ ONNX model loaded with providers: {self.session.get_providers()}")
         print(f"   Input names: {self.input_names}")
         print(f"   Output names: {self.output_names}")
+
+        if device == 'cuda':
+            print("   Warming up CUDA kernels (first-run compilation, may take 30-120s)...")
+            dummy = np.zeros((1, 3, input_size[0], input_size[1]), dtype=np.float32)
+            self.session.run(self.output_names, {self.input_names[0]: dummy})
+            print("   CUDA warmup complete.")
     
     def _preprocess(self, frame: np.ndarray) -> np.ndarray:
         """Preprocess frame for ONNX model"""
