@@ -1,6 +1,6 @@
 import os
 from sas.models.builder import LANE_SEGMENTERS
-from sas.utils.sas_process import SASProcessClass
+from sas.utils.SAS_Process import SASProcessClass
 import sas.models.lane_segmenter
 import sas.models.optimized_models  # Import ONNX and TensorRT models
 

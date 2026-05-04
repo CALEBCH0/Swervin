@@ -2,6 +2,7 @@ import sys
 from PyQt5.QtWidgets import QApplication, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QDesktopWidget
 
 from sas.gui_client import Client
 from sas.utils.tilt_indicator import TiltIndicator
@@ -36,6 +37,16 @@ class StatsPanel(QWidget):
         for lbl in self.lane_labels:
             layout.addWidget(lbl)
 
+        sep = QLabel("── Geometry ──")
+        sep.setAlignment(Qt.AlignCenter)
+        layout.addWidget(sep)
+
+        self.curvature_label = QLabel("Curvature: —")
+        self.heading_label   = QLabel("Heading: —")
+        self.lookahead_label = QLabel("Lookahead: —")
+        for lbl in (self.curvature_label, self.heading_label, self.lookahead_label):
+            layout.addWidget(lbl)
+
     def update(self, label_data: dict):
         fps = label_data.get('fps')
         self.fps_label.setText(f"FPS: {fps:.1f}" if fps is not None else "FPS: —")
@@ -49,6 +60,18 @@ class StatsPanel(QWidget):
             for i, lbl in enumerate(self.lane_labels):
                 lbl.setText(f"L{i+1}: —")
 
+        curv = label_data.get('curvature')
+        self.curvature_label.setText(f"Curvature: {curv:.4f}" if curv is not None else "Curvature: —")
+
+        hdg = label_data.get('heading')
+        self.heading_label.setText(f"Heading: {hdg:.2f} rad" if hdg is not None else "Heading: —")
+
+        la = label_data.get('lookahead')
+        if la is not None:
+            self.lookahead_label.setText(f"Lookahead: ({la[0]:.0f}, {la[1]:.0f})")
+        else:
+            self.lookahead_label.setText("Lookahead: —")
+
 
 class MainWindow(QWidget):
     def __init__(self, client: Client):
@@ -61,7 +84,12 @@ class MainWindow(QWidget):
 
     def init_ui(self):
         self.setWindowTitle("Swervin")
-        self.setGeometry(100, 100, 960, 720)
+        self.resize(1920, 1080)
+        screen = QDesktopWidget().availableGeometry()
+        self.move(
+            (screen.width()  - self.width())  // 2,
+            (screen.height() - self.height()) // 2,
+        )
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)

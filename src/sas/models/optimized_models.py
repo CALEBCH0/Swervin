@@ -31,9 +31,10 @@ class ONNXERFNet(BaseModelClass):
     def __init__(self, model_path, input_size=(288, 800), dataset='culane', device='cpu'):
         if not ONNX_AVAILABLE:
             raise ImportError("ONNX Runtime not installed. Run: pip install onnxruntime-gpu")
-        
+
         self.INPUT_SIZE = input_size
         self.device = device
+        self.dataset = dataset
         
         # Set providers based on device
         if device == 'cuda':
@@ -92,7 +93,12 @@ class ONNXERFNet(BaseModelClass):
         if binary_mask.shape != self.INPUT_SIZE:
             binary_mask = cv2.resize(binary_mask, (self.INPUT_SIZE[1], self.INPUT_SIZE[0]))
 
-        metadata = {'model_type': 'onnx', 'num_classes': seg_mask.shape[0], 'lane_confidences': lane_confidences}
+        metadata = {
+            'model_type': 'onnx',
+            'num_classes': seg_mask.shape[0],
+            'lane_confidences': lane_confidences,
+            'dataset': self.dataset,
+        }
         
         return binary_mask, confidence, metadata
     

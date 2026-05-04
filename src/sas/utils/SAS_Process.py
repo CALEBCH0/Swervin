@@ -3,8 +3,9 @@ import os
 import cv2
 import numpy as np
 
-from sas.utils.sas_results import SASResults, SegResult, BEVResult
+from sas.utils.sas_results import SASResults, SegResult, BEVResult, GeometryResult
 from sas.utils.bev_transformer import apply_bev_transform
+from sas.utils.lane_geometry import extract_geometry
 
 
 class SASProcessClass:
@@ -46,37 +47,29 @@ class SASProcessClass:
             confidence=confidence,
             lane_confidences=metadata.get('lane_confidences'),
         )
+        dataset = metadata.get('dataset', 'culane')
 
-        # BEV transform
+        # BEV transform + geometry extraction
         if self.M_bev is not None:
-            print("[SASProcess] Applying BEV transform")
             bev_mask = apply_bev_transform(mask, self.M_bev, self.bev_output_size)
-            if bev_mask is None:
-                print("[SASProcess] BEV transform failed, got None")
-            self.results.bev = BEVResult(bev_mask=bev_mask, src_points=None)  # src_points can be added later if needed
-        else:
-            print("[SASProcess] No BEV homography available, skipping BEV transform")
-        # Lane mask points extraction in BEV
-        # lane_points = self.extract_lane_points(bev_mask)
+            self.results.bev = BEVResult(bev_mask=bev_mask, src_points=None)
 
-        # Fit lane centerline polynomial
-        # x = ay^2 + by + c
-        # lane_polynomials = self.fit_lane_polynomial(lane_points)
+            geom = extract_geometry(bev_mask, dataset=dataset)
+            if geom is not None:
+                centerline, heading, curvature, lookahead = geom
+                self.results.geometry = GeometryResult(
+                    centerline=centerline,
+                    curvature=curvature,
+                    heading=heading,
+                    lookahead=lookahead,
+                )
+                print(f"[SASProcess] Geometry extracted: curvature={curvature:.4f}, heading={heading:.2f}°, lookahead={lookahead}")
+            else:
+                print("[SASProcess] Geometry extraction failed, got None")
 
-        # Curvature and lookahead point calculation
-        # geometry = self.compute_geometry(lane_polynomials)
-        # self.results.geometry = GeometryResult(
-        #     centerline=geometry['centerline'],
-        #     curvature=geometry['curvature'],
-        #     heading=geometry['heading'],
-        #     lookahead=geometry['lookahead']
-        # )
 
-        # Control math
-        # steering_target = pure_pursuit(geometry)
-        # self.results.control = ControlResult(
-        #     steering_target=steering_target,
-        #     steering_error=geometry['steering_error']
-        # )
+        # Control math (Pure Pursuit — next step)
+        # steering_target = pure_pursuit(self.results.geometry)
+        # self.results.control = ControlResult(...)
 
         return frame, self.results

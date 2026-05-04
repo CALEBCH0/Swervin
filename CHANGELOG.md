@@ -4,6 +4,26 @@
 
 ### Bug Fixes
 
+#### model_loader imported sas_process with wrong case — ModuleNotFoundError on Linux
+Date: 2026-05-04
+**Type:** Bug Fix
+**Context:** `model_loader.py` imported `from sas.utils.sas_process import SASProcessClass`. On Windows (NTFS, case-insensitive) this resolved to `SAS_Process.py`, but on Linux/WSL2 the filesystem is case-sensitive and the module was not found, crashing startup.
+**Cause:** Module name in import did not match the actual filename casing.
+**Fix:** Changed import to `from sas.utils.SAS_Process import SASProcessClass`.
+**Files changed:**
+- `src/sas/utils/model_loader.py`
+**Impact:** Pipeline starts correctly on Linux/WSL2.
+
+#### apply_bev_transform used INTER_LINEAR on segmentation class masks
+Date: 2026-05-04
+**Type:** Bug Fix
+**Context:** `warpPerspective` with `INTER_LINEAR` interpolates between adjacent pixel values. For a segmentation mask with discrete class labels (0–4), this produces fractional values (e.g. 1.5) at class boundaries, corrupting lane class identity and making per-class point extraction unreliable.
+**Cause:** Default interpolation was `cv2.INTER_LINEAR`, which is correct for images but wrong for class masks.
+**Fix:** Changed default to `cv2.INTER_NEAREST` via a `flags` parameter; callers can pass `INTER_LINEAR` for RGB images.
+**Files changed:**
+- `src/sas/utils/bev_transformer.py`
+**Impact:** BEV mask class labels are preserved exactly; per-class lane point extraction in geometry step is now correct.
+
 #### lane_exist output treated as probabilities but is raw logits
 Date: 2026-05-03
 **Type:** Bug Fix
@@ -36,6 +56,37 @@ Date: 2026-05-03
 **Impact:** Runner thread no longer crashes silently on first frame; BEV results are stored correctly.
 
 ### Features
+
+#### Lane geometry extraction from BEV mask
+Date: 2026-05-04
+**Type:** Feature
+**Context:** The BEV mask was produced but never analysed — the geometry step was stubbed out. This implements polynomial lane fitting, centerline generation, curvature, heading, and lookahead point extraction.
+**Change:** New `src/sas/utils/lane_geometry.py` with: per-class centroid-per-row point extraction (avoids bottom-heavy bias from thick BEV blobs), quadratic polynomial fit `x = f(y)` with outlier rejection, curvature formula `κ = x''/(1+x'²)^(3/2)`, centerline from averaged left+right polynomials (with single-lane fallback using `half_lane_width_px` offset). Dataset-specific lane class preference order in `DATASET_LANE_CONFIG` dict (currently CULane/TuSimple/LLAMAS all map classes 2,3 as ego boundaries). `SAS_Process.py` wired to call `extract_geometry` after BEV transform and populate `GeometryResult`.
+**Behavior:** When BEV is enabled and lanes are detected, `results.geometry` is populated with centerline (50×2 array), heading, curvature, and lookahead point.
+**Files changed:**
+- `src/sas/utils/lane_geometry.py` (new)
+- `src/sas/utils/SAS_Process.py`
+**Impact:** Pipeline now produces control-ready lane geometry. Pure Pursuit controller can be wired in next.
+
+#### BEV side panel replaces corner inset
+Date: 2026-05-04
+**Type:** Feature
+**Context:** The 200×200 corner inset was too small to inspect lane geometry and showed no geometry overlay. It also overwrote part of the camera frame.
+**Change:** Replaced inset with a full H×H square panel hstacked to the right of the camera frame. Panel shows colorized BEV mask (green lanes), with yellow centerline polyline and red lookahead dot overlaid when geometry is available. Falls back to seg mask (no geometry) when BEV is not enabled. Implemented as `_build_bev_panel()` module-level function in `runner.py`.
+**Behavior:** Transmitted frame is now `(W + H) × H`. BEV panel shows lane mask with geometry overlaid in real time.
+**Files changed:**
+- `src/sas/runner.py`
+**Impact:** Lane geometry is visually inspectable in the GUI; camera view is no longer partially obscured.
+
+#### GUI geometry stats section; FHD default window size; centered on screen
+Date: 2026-05-04
+**Type:** UX
+**Context:** The StatsPanel showed only FPS and per-lane confidence. Geometry values (curvature, heading, lookahead) were computed but had no display. The window also opened at 960×720 in the top-left corner.
+**Change:** Added `── Geometry ──` section to `StatsPanel` with Curvature, Heading (rad), and Lookahead (x, y) labels. Window default size changed to 1920×1080 via `resize()`; position centered on available screen via `QDesktopWidget().availableGeometry()`.
+**Behavior:** Stats panel shows geometry values live when BEV and geometry extraction are active. Window opens centered on screen at FHD resolution.
+**Files changed:**
+- `src/sas/gui_frontend.py`
+**Impact:** All pipeline outputs are visible in the GUI without manual repositioning.
 
 #### Lane stats panel showing FPS and per-lane confidence
 Date: 2026-05-03
@@ -95,6 +146,16 @@ Date: 2026-05-03
 
 ### Data and Schema
 
+#### dataset propagated through model metadata
+Date: 2026-05-04
+**Type:** Data/Schema
+**Context:** `ONNXERFNet` accepted a `dataset` constructor arg but discarded it after init. The geometry module needs to know the dataset to look up the correct lane class order (CULane vs others), but had no access to it.
+**Change:** Added `self.dataset = dataset` to `ONNXERFNet.__init__`. Added `'dataset': self.dataset` to the metadata dict returned by `_postprocess`. `SAS_Process.py` reads `metadata.get('dataset', 'culane')` and passes it to `extract_geometry`.
+**Files changed:**
+- `src/sas/models/optimized_models.py`
+- `src/sas/utils/SAS_Process.py`
+**Impact:** Switching datasets in config automatically uses the correct lane boundary class mapping in geometry extraction without any code changes.
+
 #### fps and lane_confidences added to SASResults schema and JSON payload
 Date: 2026-05-03
 **Type:** Data/Schema
@@ -119,6 +180,16 @@ Date: 2026-05-03
 ### Security
 
 ### UX
+
+#### Independent-corner BEV calibration trapezoid with smaller markers
+Date: 2026-05-04
+**Type:** UX
+**Context:** The symmetric trapezoid UI forced equal left/right half-widths, making it impossible to align both sides with lane lines when the camera is offset from the road center (as with CULane). This caused angled lanes in BEV and a non-zero heading bias on straight roads. The 8px corner circles also obscured the lane markings beneath them.
+**Change:** Replaced `cx/top_hw/bot_hw` state with four independent x-values (`tl_x`, `tr_x`, `bl_x`, `br_x`) plus shared `top_y`/`bot_y` per edge. Each corner now moves freely in X; dragging a corner also moves its edge's shared Y so top/bottom edges stay horizontal. Body drag translates all corners together. Corner marker radius reduced from 8px to 3px; hit radius from 14px to 6px.
+**Behavior:** User can align the left trapezoid side with the left lane and the right side with the right lane independently. Horizontal edge constraint is still enforced.
+**Files changed:**
+- `src/sas/utils/bev_transformer.py`
+**Impact:** Camera-offset setups can now produce parallel vertical lanes in BEV; heading bias on straight roads is eliminated after recalibration.
 
 #### Drag-handle trapezoid calibration UI for BEV
 Date: 2026-05-03

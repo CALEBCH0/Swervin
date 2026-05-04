@@ -3,9 +3,10 @@ import cv2
 
 def get_src(img):
     """
-    Drag-handle trapezoid calibration. Align the green trapezoid with lane markings.
-    - Drag corners: x changes width (symmetric), y moves that edge up/down
-    - Drag inside body: translates the whole trapezoid
+    Drag-handle trapezoid calibration. Each corner moves independently in X;
+    top and bottom edges stay horizontal (shared Y per edge).
+    - Drag a corner: moves that corner's X and its edge's shared Y
+    - Drag inside body: translates all corners together
     - Enter to confirm, Q to cancel
     Returns:
         src: (4, 2) float32 array [TL, TR, BR, BL], or empty array if cancelled
@@ -15,17 +16,22 @@ def get_src(img):
     win = "BEV Calibration | drag corners/body to align | Enter=confirm  Q=quit"
 
     s = {
-        'cx':     W // 2,
-        'top_y':  H // 3,
-        'bot_y':  H - H // 8,
-        'top_hw': W // 10,
-        'bot_hw': W // 4,
+        'tl_x': W // 2 - W // 10,
+        'tr_x': W // 2 + W // 10,
+        'bl_x': W // 2 - W // 4,
+        'br_x': W // 2 + W // 4,
+        'top_y': H // 3,
+        'bot_y': H - H // 8,
     }
     drag = {'handle': None}
 
     def pts():
-        cx, ty, by, thw, bhw = s['cx'], s['top_y'], s['bot_y'], s['top_hw'], s['bot_hw']
-        return [(cx - thw, ty), (cx + thw, ty), (cx + bhw, by), (cx - bhw, by)]
+        return [
+            (int(s['tl_x']), s['top_y']),
+            (int(s['tr_x']), s['top_y']),
+            (int(s['br_x']), s['bot_y']),
+            (int(s['bl_x']), s['bot_y']),
+        ]
 
     def redraw():
         clone = base.copy()
@@ -33,8 +39,8 @@ def get_src(img):
         poly = np.array(corners, np.int32).reshape((-1, 1, 2))
         cv2.polylines(clone, [poly], isClosed=True, color=(0, 220, 0), thickness=2)
         for (x, y), label in zip(corners, ('TL', 'TR', 'BR', 'BL')):
-            cv2.circle(clone, (x, y), 8, (255, 255, 255), -1)
-            cv2.circle(clone, (x, y), 8, (0, 220, 0), 2)
+            cv2.circle(clone, (x, y), 3, (255, 255, 255), -1)
+            cv2.circle(clone, (x, y), 3, (0, 220, 0), 1)
             cv2.putText(clone, label, (x + 10, y - 6),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 220, 0), 1)
         cv2.putText(clone, "Drag corners/body to align with lanes | Enter=confirm  Q=quit",
@@ -43,7 +49,7 @@ def get_src(img):
 
     def hit_corner(x, y):
         for i, (cx, cy) in enumerate(pts()):
-            if (x - cx) ** 2 + (y - cy) ** 2 <= 14 ** 2:
+            if (x - cx) ** 2 + (y - cy) ** 2 <= 6 ** 2:
                 return ('tl', 'tr', 'br', 'bl')[i]
         return None
 
@@ -60,19 +66,22 @@ def get_src(img):
             dx, dy = x - drag['sx'], y - drag['sy']
             h = drag['handle']
             if h == 'tl':
-                s['top_hw'] = max(10, drag['s_top_hw'] - dx)
-                s['top_y']  = max(0, min(drag['s_top_y'] + dy, s['bot_y'] - 10))
+                s['tl_x']  = max(0, min(drag['s_tl_x'] + dx, W))
+                s['top_y'] = max(0, min(drag['s_top_y'] + dy, s['bot_y'] - 10))
             elif h == 'tr':
-                s['top_hw'] = max(10, drag['s_top_hw'] + dx)
-                s['top_y']  = max(0, min(drag['s_top_y'] + dy, s['bot_y'] - 10))
+                s['tr_x']  = max(0, min(drag['s_tr_x'] + dx, W))
+                s['top_y'] = max(0, min(drag['s_top_y'] + dy, s['bot_y'] - 10))
             elif h == 'bl':
-                s['bot_hw'] = max(10, drag['s_bot_hw'] - dx)
-                s['bot_y']  = max(s['top_y'] + 10, min(drag['s_bot_y'] + dy, H))
+                s['bl_x']  = max(0, min(drag['s_bl_x'] + dx, W))
+                s['bot_y'] = max(s['top_y'] + 10, min(drag['s_bot_y'] + dy, H))
             elif h == 'br':
-                s['bot_hw'] = max(10, drag['s_bot_hw'] + dx)
-                s['bot_y']  = max(s['top_y'] + 10, min(drag['s_bot_y'] + dy, H))
+                s['br_x']  = max(0, min(drag['s_br_x'] + dx, W))
+                s['bot_y'] = max(s['top_y'] + 10, min(drag['s_bot_y'] + dy, H))
             elif h == 'body':
-                s['cx']    = drag['s_cx'] + dx
+                s['tl_x']  = drag['s_tl_x'] + dx
+                s['tr_x']  = drag['s_tr_x'] + dx
+                s['bl_x']  = drag['s_bl_x'] + dx
+                s['br_x']  = drag['s_br_x'] + dx
                 s['top_y'] = max(0, min(drag['s_top_y'] + dy, H))
                 s['bot_y'] = max(0, min(drag['s_bot_y'] + dy, H))
             redraw()
@@ -131,14 +140,16 @@ def compute_bev_transform(src, dst):
     return M, M_inv
 
 
-def apply_bev_transform(img, M, output_size):
+def apply_bev_transform(img, M, output_size, flags=cv2.INTER_NEAREST):
     """
     Warp a perspective-view image into BEV using homography matrix M.
     Args:
         img: input image (BGR or single-channel mask)
         M: homography matrix
         output_size: (width, height) of the BEV output
+        flags: interpolation method — INTER_NEAREST (default) preserves discrete
+               class labels in segmentation masks; use INTER_LINEAR for RGB images
     Returns:
         warped BEV image
     """
-    return cv2.warpPerspective(img, M, output_size, flags=cv2.INTER_LINEAR)
+    return cv2.warpPerspective(img, M, output_size, flags=flags)
