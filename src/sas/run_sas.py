@@ -36,9 +36,13 @@ def run_bev_calibration(raw_config):
     img = cv2.imread(img_path)
     if img is None:
         raise FileNotFoundError(f"Could not read calibration image: {img_path}")
-    img = cv2.resize(img, output_size)
+    mask_size = tuple(bev_cfg['mask_size'])  # (width, height) matching seg model output
+    img = cv2.resize(img, mask_size)
 
     src = get_src(img)
+    if len(src) < 4:
+        print("BEV calibration cancelled.")
+        return
     dst = get_dst(output_size)
     M, _ = compute_bev_transform(src, dst)
 

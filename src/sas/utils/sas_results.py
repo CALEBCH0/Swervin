@@ -52,11 +52,7 @@ class SASResults:
     def to_json(self) -> bytes:
         payload = {'active': self.active}
         if self.seg:
-            payload['segmentation_mask'] = self.seg.mask.tolist()  # Convert numpy array to list for JSON serialization
             payload['confidence'] = self.seg.confidence
-        if self.bev:
-            payload['bev_mask'] = self.bev.bev_mask.tolist()
-            payload['src_points'] = self.bev.src_points.tolist()
         if self.geometry:
             payload['centerline'] = self.geometry.centerline.tolist()
             payload['curvature'] = self.geometry.curvature

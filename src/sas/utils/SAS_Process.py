@@ -3,7 +3,7 @@ import os
 import cv2
 import numpy as np
 
-from sas.utils.sas_results import SASResults, SegResult
+from sas.utils.sas_results import SASResults, SegResult, BEVResult
 from sas.utils.bev_transformer import apply_bev_transform
 
 
@@ -45,9 +45,13 @@ class SASProcessClass:
 
         # BEV transform
         if self.M_bev is not None:
+            print("[SASProcess] Applying BEV transform")
             bev_mask = apply_bev_transform(mask, self.M_bev, self.bev_output_size)
-            self.results.bev_mask = bev_mask
-
+            if bev_mask is None:
+                print("[SASProcess] BEV transform failed, got None")
+            self.results.bev = BEVResult(bev_mask=bev_mask, src_points=None)  # src_points can be added later if needed
+        else:
+            print("[SASProcess] No BEV homography available, skipping BEV transform")
         # Lane mask points extraction in BEV
         # lane_points = self.extract_lane_points(bev_mask)
 
